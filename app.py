@@ -58,7 +58,7 @@ menu = st.sidebar.radio(
 # --- HALAMAN 1: KATALOG ---
 if menu == "🛍️ Katalog Produk":
     st.title("🛍️ Katalog Pasar Digital SEMPAT MART")
-    st.subheader("Dukung usaha sesama alumni Sempat-86!")
+    st.subheader("Belanja hemat dan cepat hanya di SEMPAT Mart!")
     st.markdown("---")
     
     search_query = st.text_input("🔍 Cari produk atau nama penjual...")
