@@ -112,9 +112,15 @@ if menu == "🛍️ Katalog Produk":
                     st.markdown(f"**👤 Penjual:** {row['Nama Penjual']} (Angkatan {row['Angkatan']})")
                     st.write(f"📝 {row['Deskripsi']}")
                     
+                    # Pastikan nomor WA diambil langsung secara spesifik dari baris (row) data produk tersebut
+                    no_wa_toko = str(row['No WA (Format: 62xx)']).strip()
+
                     wa_message = f"Halo, saya tertarik dengan produk '{row['Nama Produk']}' di SEMPAT MART."
-                    encoded_message = wa_message.replace(" ", "%20")
-                    wa_link = f"https://wa.me/{row['No WA (Format: 62xx)']}?text={encoded_message}"
+                    # Menggunakan fungsi bawaan python untuk encoding teks URL agar lebih aman dan rapi
+                    import urllib.parse
+                    encoded_message = urllib.parse.quote(wa_message)
+
+                    wa_link = f"https://wa.me/{no_wa_toko}?text={encoded_message}"
                     st.markdown(f"[💬 Hubungi Penjual via WA]({wa_link})")
 
 # --- HALAMAN 2: FORM VENDOR ---
