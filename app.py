@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from PIL import Image
 import datetime
+import urllib.parse
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
@@ -15,18 +16,53 @@ st.set_page_config(
 BASE_DIR = r"D:\DATA\01. RELIABILITY PROJECT\DATABASE PROJECT\SEMPAT Mart"
 DB_FILE = os.path.join(BASE_DIR, "sempat_mart_products.csv")
 IMG_DIR = os.path.join(BASE_DIR, "product_images")
+COUNTER_FILE = os.path.join(BASE_DIR, "visitor_counter.txt")  # File penyimpan hitungan kunjungan
 
 if not os.path.exists(IMG_DIR):
     os.makedirs(IMG_DIR)
 
+# --- FUNGSI PENGHITUNG KUNJUNGAN (FITUR BARU) ---
+def get_and_update_views():
+    # Jika file belum ada, buat baru dengan angka 0
+    if not os.path.exists(COUNTER_FILE):
+        with open(COUNTER_FILE, "w") as f:
+            f.write("0")
+    
+    # Jalankan penambahan angka hanya sekali per sesi halaman dimuat
+    if "visited" not in st.session_state:
+        st.session_state["visited"] = True
+        try:
+            with open(COUNTER_FILE, "r") as f:
+                current_views = int(f.read().strip())
+        except Exception:
+            current_views = 0
+            
+        new_views = current_views + 1
+        
+        try:
+            with open(COUNTER_FILE, "w") as f:
+                f.write(str(new_views))
+        except Exception:
+            pass
+        return new_views
+    else:
+        # Jika hanya ganti-ganti menu halaman, baca angka saat ini saja (tidak menambah hitungan)
+        try:
+            with open(COUNTER_FILE, "r") as f:
+                return int(f.read().strip())
+        except Exception:
+            return 0
+
+# Panggil fungsi hitung saat aplikasi pertama kali dimuat di browser pengguna
+total_kunjungan = get_and_update_views()
+
 def load_data():
     if os.path.exists(DB_FILE):
         try:
-            return pd.read_csv(DB_FILE, dtype={"Harga": str}).fillna("")
+            return pd.read_csv(DB_FILE, dtype={"Harga": str, "No WA (Format: 62xx)": str}).fillna("")
         except Exception:
             pass
             
-    # Database kosong jika file belum ada
     data = {
         "Nama Penjual": [],
         "Angkatan": [],
@@ -55,10 +91,14 @@ menu = st.sidebar.radio(
     ["🛍️ Katalog Produk", "➕ Daftarkan Jualan Anda", "⚙️ Kelola Jualan Anda"]
 )
 
+# TAMPILKAN TOTAL KUNJUNGAN DI BAWAH SIDEBAR (FITUR BARU)
+st.sidebar.markdown("---")
+st.sidebar.metric(label="👥 Total Pengunjung Situs", value=f"{total_kunjungan} Kali")
+
 # --- HALAMAN 1: KATALOG ---
 if menu == "🛍️ Katalog Produk":
     st.title("🛍️ Katalog Pasar Digital SEMPAT MART")
-    st.subheader("Belanja hemat dan cepat hanya di SEMPAT Mart!")
+    st.subheader("Dukung usaha sesama alumni Sempat-86!")
     st.markdown("---")
     
     search_query = st.text_input("🔍 Cari produk atau nama penjual...")
@@ -78,7 +118,6 @@ if menu == "🛍️ Katalog Produk":
             col = cols[index % 3]
             with col:
                 with st.container(border=True):
-                    # FOTO PRODUK
                     images_str = str(row['Daftar File Gambar'])
                     image_list = [img.strip() for img in images_str.split(",") if img.strip()]
                     
@@ -100,7 +139,6 @@ if menu == "🛍️ Katalog Produk":
                     else:
                         st.warning("⚠️ Foto tidak tersedia")
                         
-                    # FORMAT TAMPILAN HARGA
                     harga_raw = str(row['Harga'])
                     if harga_raw.isdigit():
                         harga_display = f"Rp {int(harga_raw):,}"
@@ -112,15 +150,11 @@ if menu == "🛍️ Katalog Produk":
                     st.markdown(f"**👤 Penjual:** {row['Nama Penjual']} (Angkatan {row['Angkatan']})")
                     st.write(f"📝 {row['Deskripsi']}")
                     
-                    # Pastikan nomor WA diambil langsung secara spesifik dari baris (row) data produk tersebut
-                    no_wa_toko = str(row['No WA (Format: 62xx)']).strip()
-
+                    no_wa_aktif = str(row['No WA (Format: 62xx)']).strip()
                     wa_message = f"Halo, saya tertarik dengan produk '{row['Nama Produk']}' di SEMPAT MART."
-                    # Menggunakan fungsi bawaan python untuk encoding teks URL agar lebih aman dan rapi
-                    import urllib.parse
                     encoded_message = urllib.parse.quote(wa_message)
-
-                    wa_link = f"https://wa.me/{no_wa_toko}?text={encoded_message}"
+                    
+                    wa_link = f"https://wa.me/{no_wa_aktif}?text={encoded_message}"
                     st.markdown(f"[💬 Hubungi Penjual via WA]({wa_link})")
 
 # --- HALAMAN 2: FORM VENDOR ---
@@ -206,17 +240,15 @@ elif menu == "➕ Daftarkan Jualan Anda":
             else:
                 st.error("Mohon lengkapi data penting: Nama, Nama Produk, WhatsApp, dan minimal 1 Foto Produk.")
 
-# --- HALAMAN 3: EDIT & DELETE (FITUR BARU) ---
+# --- HALAMAN 3: EDIT & DELETE ---
 elif menu == "⚙️ Kelola Jualan Anda":
     st.title("⚙️ Kelola Jualan Anda")
     st.write("Masukkan Nomor WhatsApp Anda untuk melihat dan mengedit/menghapus produk yang pernah didaftarkan.")
     
-    # Validasi kepemilikan data berdasarkan Nomor WA
     verifikasi_wa = st.text_input("Masukkan Nomor WhatsApp Anda saat mendaftar:", placeholder="Contoh: 62812345...")
     
     if verifikasi_wa:
         clean_verif_wa = "".join(filter(str.isdigit, verifikasi_wa))
-        # Filter database hanya menampilkan milik nomor tersebut
         user_products = df_products[df_products["No WA (Format: 62xx)"].astype(str) == clean_verif_wa]
         
         if user_products.empty:
@@ -224,13 +256,11 @@ elif menu == "⚙️ Kelola Jualan Anda":
         else:
             st.success(f"Ditemukan {len(user_products)} produk Anda.")
             
-            # Pilih produk yang mau dikelola
             produk_pilihan = st.selectbox(
                 "Pilih Produk yang Ingin Dikelola:", 
                 user_products["Nama Produk"].tolist()
             )
             
-            # Mengambil indeks asli baris database untuk proses update/delete
             target_idx = df_products[
                 (df_products["No WA (Format: 62xx)"].astype(str) == clean_verif_wa) & 
                 (df_products["Nama Produk"] == produk_pilihan)
@@ -241,7 +271,6 @@ elif menu == "⚙️ Kelola Jualan Anda":
             st.markdown("---")
             action = st.radio("Pilih Tindakan:", ["📝 Edit Data Produk", "❌ Hapus Produk dari Toko"])
             
-            # --- FITUR EDIT ---
             if action == "📝 Edit Data Produk":
                 st.subheader(f"Form Edit: {row_data['Nama Produk']}")
                 
@@ -255,7 +284,6 @@ elif menu == "⚙️ Kelola Jualan Anda":
                         index=["Kuliner", "Fashion & Atribut", "Jasa / Keahlian", "Umum"].index(row_data["Kategori"]) if row_data["Kategori"] in ["Kuliner", "Fashion & Atribut", "Jasa / Keahlian", "Umum"] else 0
                     )
                     
-                    # Logika deteksi harga lama (apakah digit atau teks)
                     harga_lama = str(row_data["Harga"])
                     is_harga_digit = harga_lama.isdigit()
                     
@@ -277,13 +305,11 @@ elif menu == "⚙️ Kelola Jualan Anda":
                         edit_harga_final = edit_harga_opsi
                         
                     edit_deskripsi = st.text_area("Deskripsi Singkat:", value=row_data["Deskripsi"])
-                    
                     st.info("💡 Catatan: Untuk versi saat ini, jika ingin mengganti foto silakan hapus produk lalu daftarkan kembali dengan foto baru.")
                     
                     submit_edit = st.form_submit_button("Simpan Perubahan")
                     
                     if submit_edit:
-                        # Update data ke dalam DataFrame asli
                         df_products.at[target_idx, "Nama Penjual"] = edit_nama_penjual
                         df_products.at[target_idx, "Angkatan"] = edit_angkatan
                         df_products.at[target_idx, "Nama Produk"] = edit_nama_produk
@@ -295,17 +321,14 @@ elif menu == "⚙️ Kelola Jualan Anda":
                         st.success("🎉 Perubahan data produk berhasil disimpan!")
                         st.rerun()
 
-            # --- FITUR DELETE ---
             elif action == "❌ Hapus Produk dari Toko":
                 st.subheader(f"Hapus Produk: {row_data['Nama Produk']}")
                 st.warning("⚠️ Apakah Anda yakin ingin menghapus produk ini secara permanen dari SEMPAT MART?")
                 
-                # Konfirmasi tombol hapus demi keamanan data
                 konfirmasi_hapus = st.checkbox("Ya, saya setuju menghapus produk ini secara permanen.")
                 tombol_hapus = st.button("Hapus Produk Sekarang", type="primary", disabled=not konfirmasi_hapus)
                 
                 if tombol_hapus:
-                    # Proses hapus file foto dari folder komputer agar memori hemat
                     images_str = str(row_data['Daftar File Gambar'])
                     image_list = [img.strip() for img in images_str.split(",") if img.strip()]
                     for img_name in image_list:
@@ -316,9 +339,7 @@ elif menu == "⚙️ Kelola Jualan Anda":
                             except Exception:
                                 pass
                                 
-                    # Hapus baris dari DataFrame berdasarkan indeks
                     df_products = df_products.drop(target_idx)
                     save_data(df_products)
-                    
                     st.success("❌ Produk telah berhasil dihapus dari sistem.")
                     st.rerun()
