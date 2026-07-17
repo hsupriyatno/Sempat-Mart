@@ -7,7 +7,7 @@ import urllib.parse
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
-    page_title="SEMPAT MART - Alumni Sempat-86",
+    page_title="SEMPAT MART - Alumni SMPN-4 Cirebon",
     page_icon="🛍️",
     layout="wide"
 )
