@@ -84,7 +84,7 @@ df_products = load_data()
 
 # --- SIDEBAR ---
 st.sidebar.title("SEMPAT MART 🛒")
-st.sidebar.write("Dari Kita, Oleh Kita, Untuk Alumni Sempat-86")
+st.sidebar.write("Dari Kita, Oleh Kita, Untuk Alumni SMPN-4 Cirebon")
 st.sidebar.markdown("---")
 menu = st.sidebar.radio(
     "Navigasi Halaman:", 
@@ -98,7 +98,7 @@ st.sidebar.metric(label="👥 Total Pengunjung Situs", value=f"{total_kunjungan}
 # --- HALAMAN 1: KATALOG ---
 if menu == "🛍️ Katalog Produk":
     st.title("🛍️ Katalog Pasar Digital SEMPAT MART")
-    st.subheader("Dukung usaha sesama alumni Sempat-86!")
+    st.subheader("Dukung usaha sesama alumni SMPN-4 Cirebon")
     st.markdown("---")
     
     search_query = st.text_input("🔍 Cari produk atau nama penjual...")
