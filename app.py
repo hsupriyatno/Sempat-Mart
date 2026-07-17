@@ -98,7 +98,7 @@ st.sidebar.metric(label="👥 Total Pengunjung Situs", value=f"{total_kunjungan}
 # --- HALAMAN 1: KATALOG ---
 if menu == "🛍️ Katalog Produk":
     st.title("🛍️ Katalog Pasar Digital SEMPAT MART")
-    st.subheader("Dukung usaha sesama alumni SMPN-4 Cirebon")
+    st.subheader("Dukung usaha sesama alumni SMPN-4 Cirebon!")
     st.markdown("---")
     
     search_query = st.text_input("🔍 Cari produk atau nama penjual...")
@@ -164,7 +164,7 @@ elif menu == "➕ Daftarkan Jualan Anda":
     
     with st.form("form_tambah_produk", clear_on_submit=False):
         nama_penjual = st.text_input("Nama Lengkap:")
-        angkatan = st.selectbox("Angkatan Sempat:", ["86", "Lainnya"])
+        angkatan = st.selectbox("Angkatan SMPN-4 Cirebon:", ["86", "Lainnya"])
         nama_produk = st.text_input("Nama Produk/Jasa:")
         
         uploaded_images = st.file_uploader(
