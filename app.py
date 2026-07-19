@@ -12,11 +12,17 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- KONFIGURASI PATH & DATABASE ---
-BASE_DIR = r"D:\DATA\01. RELIABILITY PROJECT\DATABASE PROJECT\SEMPAT Mart"
+# --- KONFIGURASI PATH & DATABASE (OTOMATIS DETEKSI CLOUD / LOKAL) ---
+# Jika berjalan di Cloud, gunakan direktori saat ini. Jika di lokal Windows, gunakan path absolut Anda.
+if os.path.exists(r"D:\DATA\01. RELIABILITY PROJECT\DATABASE PROJECT\SEMPAT Mart"):
+    BASE_DIR = r"D:\DATA\01. RELIABILITY PROJECT\DATABASE PROJECT\SEMPAT Mart"
+else:
+    BASE_DIR = os.getcwd() # Mengambil direktori kerja di server Streamlit Cloud
+
+# Pastikan nama file ini sama persis (huruf kecil semua) dengan yang ada di GitHub
 DB_FILE = os.path.join(BASE_DIR, "sempat_mart_products.csv")
 IMG_DIR = os.path.join(BASE_DIR, "product_images")
-COUNTER_FILE = os.path.join(BASE_DIR, "visitor_counter.txt")  # File penyimpan hitungan kunjungan
+COUNTER_FILE = os.path.join(BASE_DIR, "visitor_counter.txt")
 
 if not os.path.exists(IMG_DIR):
     os.makedirs(IMG_DIR)
