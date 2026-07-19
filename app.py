@@ -13,7 +13,6 @@ st.set_page_config(
 )
 
 # --- KONFIGURASI PATH & DATABASE (OTOMATIS DETEKSI CLOUD / LOKAL) ---
-# Jika berjalan di Cloud, gunakan direktori saat ini. Jika di lokal Windows, gunakan path absolut Anda.
 if os.path.exists(r"D:\DATA\01. RELIABILITY PROJECT\DATABASE PROJECT\SEMPAT Mart"):
     BASE_DIR = r"D:\DATA\01. RELIABILITY PROJECT\DATABASE PROJECT\SEMPAT Mart"
 else:
@@ -27,14 +26,12 @@ COUNTER_FILE = os.path.join(BASE_DIR, "visitor_counter.txt")
 if not os.path.exists(IMG_DIR):
     os.makedirs(IMG_DIR)
 
-# --- FUNGSI PENGHITUNG KUNJUNGAN (FITUR BARU) ---
+# --- FUNGSI PENGHITUNG KUNJUNGAN ---
 def get_and_update_views():
-    # Jika file belum ada, buat baru dengan angka 0
     if not os.path.exists(COUNTER_FILE):
         with open(COUNTER_FILE, "w") as f:
             f.write("0")
     
-    # Jalankan penambahan angka hanya sekali per sesi halaman dimuat
     if "visited" not in st.session_state:
         st.session_state["visited"] = True
         try:
@@ -52,32 +49,35 @@ def get_and_update_views():
             pass
         return new_views
     else:
-        # Jika hanya ganti-ganti menu halaman, baca angka saat ini saja (tidak menambah hitungan)
         try:
             with open(COUNTER_FILE, "r") as f:
                 return int(f.read().strip())
         except Exception:
             return 0
 
-# Panggil fungsi hitung saat aplikasi pertama kali dimuat di browser pengguna
 total_kunjungan = get_and_update_views()
 
+# --- FUNGSI PEMBACAAN DATA YANG DIPERBAIKI (LEBIH AMAN) ---
 def load_data():
     if os.path.exists(DB_FILE):
         try:
-            return pd.read_csv(DB_FILE, dtype={"Harga": str, "No WA (Format: 62xx)": str}).fillna("")
-        except Exception:
-            pass
+            # Baca semua kolom sebagai string untuk mencegah eror pembacaan tipe data
+            df = pd.read_csv(DB_FILE, dtype=str)
+            df = df.fillna("")
             
+            # Validasi kolom wajib agar struktur DataFrame konsisten
+            kolom_wajib = ["Nama Penjual", "Angkatan", "Nama Produk", "Kategori", "Harga", "No WA (Format: 62xx)", "Deskripsi", "Daftar File Gambar"]
+            for col in kolom_wajib:
+                if col not in df.columns:
+                    df[col] = ""
+            return df
+        except Exception as e:
+            st.error(f"Gagal membaca file data utama: {e}")
+            
+    # Membuat file template baru hanya jika file benar-benar tidak ditemukan fisik
     data = {
-        "Nama Penjual": [],
-        "Angkatan": [],
-        "Nama Produk": [],
-        "Kategori": [],
-        "Harga": [],
-        "No WA (Format: 62xx)": [],
-        "Deskripsi": [],
-        "Daftar File Gambar": []
+        "Nama Penjual": [], "Angkatan": [], "Nama Produk": [], "Kategori": [],
+        "Harga": [], "No WA (Format: 62xx)": [], "Deskripsi": [], "Daftar File Gambar": []
     }
     df = pd.DataFrame(data)
     df.to_csv(DB_FILE, index=False)
@@ -97,9 +97,43 @@ menu = st.sidebar.radio(
     ["🛍️ Katalog Produk", "➕ Daftarkan Jualan Anda", "⚙️ Kelola Jualan Anda"]
 )
 
-# TAMPILKAN TOTAL KUNJUNGAN DI BAWAH SIDEBAR (FITUR BARU)
 st.sidebar.markdown("---")
 st.sidebar.metric(label="👥 Total Pengunjung Situs", value=f"{total_kunjungan} Kali")
+
+# ==========================================
+# 💾 FITUR BARU: UTILITY BACKUP & RESTORE
+# ==========================================
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🛠️ Fitur Cadangan Database")
+
+# Tombol Download Backup Aktif
+if not df_products.empty:
+    csv_bytes = df_products.to_csv(index=False).encode('utf-8')
+    st.sidebar.download_button(
+        label="📥 Download Data CSV Terbaru",
+        data=csv_bytes,
+        file_name="sempat_mart_products_backup.csv",
+        mime="text/csv",
+        help="Simpan backup data lokal ini di komputer/HP Anda untuk mengamankan data merchant."
+    )
+
+# Tombol Upload/Restore Data
+uploaded_backup = st.sidebar.file_uploader(
+    "Upload file backup untuk memulihkan data:", 
+    type=["csv"], 
+    key="backup_uploader"
+)
+
+if uploaded_backup is not None:
+    if st.sidebar.button("🔄 Jalankan Restore Data", type="primary"):
+        try:
+            df_restored = pd.read_csv(uploaded_backup, dtype=str).fillna("")
+            save_data(df_restored)
+            st.sidebar.success("✅ Data merchant berhasil dipulihkan!")
+            st.rerun()
+        except Exception as ex:
+            st.sidebar.error(f"Gagal memulihkan data: {ex}")
+
 
 # --- HALAMAN 1: KATALOG ---
 if menu == "🛍️ Katalog Produk":
@@ -156,12 +190,31 @@ if menu == "🛍️ Katalog Produk":
                     st.markdown(f"**👤 Penjual:** {row['Nama Penjual']} (Angkatan {row['Angkatan']})")
                     st.write(f"📝 {row['Deskripsi']}")
                     
+                    # --- FIX HUBUNGI WA DI HP (DEEP-LINKING) ---
                     no_wa_aktif = str(row['No WA (Format: 62xx)']).strip()
                     wa_message = f"Halo, saya tertarik dengan produk '{row['Nama Produk']}' di SEMPAT MART."
                     encoded_message = urllib.parse.quote(wa_message)
                     
-                    wa_link = f"https://wa.me/{no_wa_aktif}?text={encoded_message}"
-                    st.markdown(f"[💬 Hubungi Penjual via WA]({wa_link})")
+                    wa_link = f"https://api.whatsapp.com/send?phone={no_wa_aktif}&text={encoded_message}"
+                    
+                    tombol_wa_html = f"""
+                        <a href="{wa_link}" target="_blank" style="
+                            display: inline-block;
+                            padding: 10px 20px;
+                            background-color: #25D366;
+                            color: white;
+                            text-align: center;
+                            text-decoration: none;
+                            font-size: 15px;
+                            font-weight: bold;
+                            border-radius: 8px;
+                            margin-top: 10px;
+                            box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+                        ">
+                            💬 Hubungi Penjual via WA
+                        </a>
+                    """
+                    st.markdown(tombol_wa_html, unsafe_allow_html=True)
 
 # --- HALAMAN 2: FORM VENDOR ---
 elif menu == "➕ Daftarkan Jualan Anda":
