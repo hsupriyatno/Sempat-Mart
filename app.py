@@ -4,6 +4,7 @@ import os
 from PIL import Image
 import datetime
 import urllib.parse
+from geopy.distance import geodesic
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
@@ -12,13 +13,140 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- KONFIGURASI PATH & DATABASE (OTOMATIS DETEKSI CLOUD / LOKAL) ---
+# --- DATABASE HIERARKI KECAMATAN & DESA/KELURAHAN ---
+# Format: "Nama Kecamatan": {"Nama Desa/Kelurahan": (Latitude, Longitude)}
+DATA_WILAYAH = {
+    # --- KOTA CIREBON ---
+    "Kota Cirebon - Kec. Kejaksan": {
+        "Kel. Kejaksan": (-6.7088, 108.5562),
+        "Kel. Kesenden": (-6.7012, 108.5583),
+        "Kel. Sukapura": (-6.7035, 108.5461),
+        "Kel. Kebonbaru": (-6.7130, 108.5590)
+    },
+    "Kota Cirebon - Kec. Lemahwungkuk": {
+        "Kel. Lemahwungkuk": (-6.7235, 108.5671),
+        "Kel. Panjunan": (-6.7168, 108.5662),
+        "Kel. Pegambiran": (-6.7380, 108.5721),
+        "Kel. Kesepuhan": (-6.7265, 108.5620)
+    },
+    "Kota Cirebon - Kec. Pekalipan": {
+        "Kel. Pekalipan": (-6.7221, 108.5589),
+        "Kel. Pulasaren": (-6.7238, 108.5550),
+        "Kel. Jagasatru": (-6.7285, 108.5571)
+    },
+    "Kota Cirebon - Kec. Kesambi": {
+        "Kel. Kesambi": (-6.7305, 108.5482),
+        "Kel. Sunyaragi": (-6.7362, 108.5398),
+        "Kel. Karyamulya": (-6.7410, 108.5285),
+        "Kel. Drajat": (-6.7328, 108.5521),
+        "Kel. Pekiringan": (-6.7188, 108.5501)
+    },
+    "Kota Cirebon - Kec. Harjamukti": {
+        "Kel. Harjamukti": (-6.7580, 108.5412),
+        "Kel. Kalijaga": (-6.7485, 108.5610),
+        "Kel. Argasunya": (-6.7820, 108.5505),
+        "Kel. Larangan": (-6.7395, 108.5580),
+        "Kel. Kebonmanis": (-6.7450, 108.5490)
+    },
+
+    # --- KABUPATEN CIREBON ---
+    "Kab. Cirebon - Kec. Kedawung": {
+        "Desa Kedawung": (-6.7095, 108.5350),
+        "Desa Kertawinangun (Tuparev)": (-6.7110, 108.5380),
+        "Desa Sutawinangun": (-6.7125, 108.5320),
+        "Desa Kalitoa": (-6.7080, 108.5280)
+    },
+    "Kab. Cirebon - Kec. Weru": {
+        "Desa Megu Gede": (-6.7180, 108.5080),
+        "Desa Megu Cilik": (-6.7150, 108.5020),
+        "Desa Tegalwangi": (-6.7120, 108.4980),
+        "Desa Weru Lor": (-6.7050, 108.5050),
+        "Desa Weru Kidul": (-6.7080, 108.5010)
+    },
+    "Kab. Cirebon - Kec. Plumbon": {
+        "Desa Plumbon": (-6.7100, 108.4680),
+        "Desa Gombang": (-6.7150, 108.4550),
+        "Desa Marikangen": (-6.7200, 108.4600),
+        "Desa Padasuka": (-6.7080, 108.4500)
+    },
+    "Kab. Cirebon - Kec. Sumber": {
+        "Kel. Sumber (Pusat Pemkab)": (-6.7610, 108.4810),
+        "Kel. Babakan": (-6.7550, 108.4850),
+        "Kel. Watubelah": (-6.7420, 108.4920),
+        "Kel. Sendang": (-6.7500, 108.4780)
+    },
+    "Kab. Cirebon - Kec. Mundu": {
+        "Desa Mundu Pesisir": (-6.7520, 108.6010),
+        "Desa Bandengan": (-6.7580, 108.6100),
+        "Desa Luwung": (-6.7650, 108.5880)
+    },
+    "Kab. Cirebon - Kec. Astanajapura": {
+        "Desa Japura Bakti": (-6.8120, 108.6350),
+        "Desa Mertapada": (-6.8050, 108.6280),
+        "Desa Kanci": (-6.7890, 108.6200)
+    },
+
+    # --- WILAYAH SEKITAR (CIAYUMAJAKUNING) ---
+    "Kab. Kuningan": {
+        "Kec. Cilimus": (-6.8520, 108.5050),
+        "Kec. Jalaksana": (-6.8900, 108.5010),
+        "Kec. Kuningan Kota": (-6.9760, 108.4830)
+    },
+    "Kab. Majalengka": {
+        "Kec. Rajagaluh": (-6.8280, 108.3420),
+        "Kec. Jatiwangi": (-6.7320, 108.2610),
+        "Kec. Majalengka Kota": (-6.8360, 108.2280)
+    },
+    "Kab. Indramayu": {
+        "Kec. Jatibarang": (-6.4710, 108.3090),
+        "Kec. Karangampel": (-6.4620, 108.4520),
+        "Kec. Indramayu Kota": (-6.3260, 108.3200)
+    }
+}
+
+LIST_KECAMATAN = list(DATA_WILAYAH.keys())
+
+# --- FUNGSI PARSING DARI STRING DATABASE ---
+# Format simpanan di database: "Kecamatan | Desa"
+def get_coords_from_str(lokasi_str):
+    try:
+        if " | " in str(lokasi_str):
+            kec, desa = str(lokasi_str).split(" | ", 1)
+            if kec in DATA_WILAYAH and desa in DATA_WILAYAH[kec]:
+                return DATA_WILAYAH[kec][desa]
+        # Default jika format lama / fallback ke Kesambi
+        return (-6.7305, 108.5482)
+    except Exception:
+        return (-6.7305, 108.5482)
+
+# --- FUNGSI HITUNG ONGKIR DARI HIERARKI ---
+def hitung_ongkir_cascading(lokasi_asal_str, lokasi_tujuan_str, tarif_per_km=4000, min_ongkir=10000):
+    try:
+        coord1 = get_coords_from_str(lokasi_asal_str)
+        coord2 = get_coords_from_str(lokasi_tujuan_str)
+        
+        # 1. Jarak Garis Lurus
+        jarak_garis_lurus = geodesic(coord1, coord2).km
+        
+        # 2. Jarak Rute Jalan Raya (Pengali 1.2)
+        jarak_rute = jarak_garis_lurus * 1.2
+        
+        # Jika asal & tujuan sama persis (sama kelurahan/desa)
+        if jarak_rute < 0.5:
+            jarak_rute = 0.5
+            
+        # 3. Hitung Total Ongkir
+        total_ongkir = max(min_ongkir, jarak_rute * tarif_per_km)
+        return round(jarak_rute, 1), int(total_ongkir)
+    except Exception:
+        return 1.0, min_ongkir
+
+# --- KONFIGURASI PATH & DATABASE ---
 if os.path.exists(r"D:\DATA\01. RELIABILITY PROJECT\DATABASE PROJECT\SEMPAT Mart"):
     BASE_DIR = r"D:\DATA\01. RELIABILITY PROJECT\DATABASE PROJECT\SEMPAT Mart"
 else:
-    BASE_DIR = os.getcwd() # Mengambil direktori kerja di server Streamlit Cloud
+    BASE_DIR = os.getcwd()
 
-# Pastikan nama file ini sama persis (huruf kecil semua) dengan yang ada di GitHub
 DB_FILE = os.path.join(BASE_DIR, "sempat_mart_products.csv")
 IMG_DIR = os.path.join(BASE_DIR, "product_images")
 COUNTER_FILE = os.path.join(BASE_DIR, "visitor_counter.txt")
@@ -57,27 +185,25 @@ def get_and_update_views():
 
 total_kunjungan = get_and_update_views()
 
-# --- FUNGSI PEMBACAAN DATA YANG DIPERBAIKI (LEBIH AMAN) ---
+# --- FUNGSI PEMBACAAN DATA ---
 def load_data():
+    default_loc = f"{LIST_KECAMATAN[0]} | {list(DATA_WILAYAH[LIST_KECAMATAN[0]].keys())[0]}"
     if os.path.exists(DB_FILE):
         try:
-            # Baca semua kolom sebagai string untuk mencegah eror pembacaan tipe data
             df = pd.read_csv(DB_FILE, dtype=str)
             df = df.fillna("")
             
-            # Validasi kolom wajib agar struktur DataFrame konsisten
-            kolom_wajib = ["Nama Penjual", "Angkatan", "Nama Produk", "Kategori", "Harga", "No WA (Format: 62xx)", "Deskripsi", "Daftar File Gambar"]
+            kolom_wajib = ["Nama Penjual", "Angkatan", "Nama Produk", "Kategori", "Harga", "Lokasi Toko", "No WA (Format: 62xx)", "Deskripsi", "Daftar File Gambar"]
             for col in kolom_wajib:
                 if col not in df.columns:
-                    df[col] = ""
+                    df[col] = default_loc if col == "Lokasi Toko" else ""
             return df
         except Exception as e:
             st.error(f"Gagal membaca file data utama: {e}")
             
-    # Membuat file template baru hanya jika file benar-benar tidak ditemukan fisik
     data = {
         "Nama Penjual": [], "Angkatan": [], "Nama Produk": [], "Kategori": [],
-        "Harga": [], "No WA (Format: 62xx)": [], "Deskripsi": [], "Daftar File Gambar": []
+        "Harga": [], "Lokasi Toko": [], "No WA (Format: 62xx)": [], "Deskripsi": [], "Daftar File Gambar": []
     }
     df = pd.DataFrame(data)
     df.to_csv(DB_FILE, index=False)
@@ -100,13 +226,10 @@ menu = st.sidebar.radio(
 st.sidebar.markdown("---")
 st.sidebar.metric(label="👥 Total Pengunjung Situs", value=f"{total_kunjungan} Kali")
 
-# ==========================================
-# 💾 FITUR BARU: UTILITY BACKUP & RESTORE
-# ==========================================
+# UTILITY BACKUP & RESTORE
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🛠️ Fitur Cadangan Database")
 
-# Tombol Download Backup Aktif
 if not df_products.empty:
     csv_bytes = df_products.to_csv(index=False).encode('utf-8')
     st.sidebar.download_button(
@@ -114,10 +237,9 @@ if not df_products.empty:
         data=csv_bytes,
         file_name="sempat_mart_products_backup.csv",
         mime="text/csv",
-        help="Simpan backup data lokal ini di komputer/HP Anda untuk mengamankan data merchant."
+        help="Simpan backup data lokal ini di komputer/HP Anda."
     )
 
-# Tombol Upload/Restore Data
 uploaded_backup = st.sidebar.file_uploader(
     "Upload file backup untuk memulihkan data:", 
     type=["csv"], 
@@ -185,12 +307,45 @@ if menu == "🛍️ Katalog Produk":
                     else:
                         harga_display = harga_raw
 
+                    lokasi_penjual_str = str(row.get('Lokasi Toko', ''))
+
                     st.markdown(f"### **{row['Nama Produk']}**")
                     st.markdown(f"**💰 Harga:** {harga_display}")
                     st.markdown(f"**👤 Penjual:** {row['Nama Penjual']} (Angkatan {row['Angkatan']})")
+                    st.markdown(f"**📍 Lokasi Toko:** {lokasi_penjual_str}")
                     st.write(f"📝 {row['Deskripsi']}")
                     
-                    # --- FIX HUBUNGI WA DI HP (DEEP-LINKING) ---
+                    # --- KALKULATOR ONGKIR CASCADING ---
+                    with st.expander("🚚 Cek Estimasi Ongkir (Pilih Wilayah Anda)"):
+                        col_kec, col_desa = st.columns(2)
+                        with col_kec:
+                            kec_pembeli = st.selectbox(
+                                "Kecamatan/Kabupaten:", 
+                                options=LIST_KECAMATAN,
+                                key=f"kec_buyer_{index}"
+                            )
+                        with col_desa:
+                            list_desa = list(DATA_WILAYAH[kec_pembeli].keys())
+                            desa_pembeli = st.selectbox(
+                                "Desa/Kelurahan:", 
+                                options=list_desa,
+                                key=f"desa_buyer_{index}"
+                            )
+                        
+                        lokasi_pembeli_str = f"{kec_pembeli} | {desa_pembeli}"
+                        
+                        # Hitung Ongkir
+                        jarak_km, total_ongkir = hitung_ongkir_cascading(
+                            lokasi_penjual_str, 
+                            lokasi_pembeli_str,
+                            tarif_per_km=4000,  # <-- Silakan ubah tarif per km jika perlu
+                            min_ongkir=10000     # <-- Silakan ubah tarif min ongkir jika perlu
+                        )
+                        
+                        st.success(f"📏 Est. Jarak Rute (x1.2): **{jarak_km} km**")
+                        st.info(f"💵 Est. Ongkir: **Rp {total_ongkir:,}**")
+
+                    # --- HUBUNGI WA DI HP ---
                     no_wa_aktif = str(row['No WA (Format: 62xx)']).strip()
                     wa_message = f"Halo, saya tertarik dengan produk '{row['Nama Produk']}' di SEMPAT MART."
                     encoded_message = urllib.parse.quote(wa_message)
@@ -200,7 +355,8 @@ if menu == "🛍️ Katalog Produk":
                     tombol_wa_html = f"""
                         <a href="{wa_link}" target="_blank" style="
                             display: inline-block;
-                            padding: 10px 20px;
+                            width: 100%;
+                            padding: 10px 0px;
                             background-color: #25D366;
                             color: white;
                             text-align: center;
@@ -225,6 +381,16 @@ elif menu == "➕ Daftarkan Jualan Anda":
         nama_penjual = st.text_input("Nama Lengkap:")
         angkatan = st.selectbox("Angkatan SMPN-4 Cirebon:", ["86", "Lainnya"])
         nama_produk = st.text_input("Nama Produk/Jasa:")
+        
+        # CASCADING DROPDOWN UNTUK LOKASI TOKO
+        st.markdown("**📍 Lokasi Toko / Penjual:**")
+        col_kec_v, col_desa_v = st.columns(2)
+        with col_kec_v:
+            kec_vendor = st.selectbox("Pilih Kecamatan/Kabupaten:", options=LIST_KECAMATAN, key="vendor_kec_add")
+        with col_desa_v:
+            desa_vendor = st.selectbox("Pilih Desa/Kelurahan:", options=list(DATA_WILAYAH[kec_vendor].keys()), key="vendor_desa_add")
+            
+        lokasi_toko_final = f"{kec_vendor} | {desa_vendor}"
         
         uploaded_images = st.file_uploader(
             "Unggah Foto Produk (Maksimal 5 foto)", 
@@ -254,7 +420,7 @@ elif menu == "➕ Daftarkan Jualan Anda":
         submitted = st.form_submit_button("Simpan & Tayangkan Produk")
         
         if submitted:
-            if nama_penjual and nama_produk and no_wa and uploaded_images:
+            if nama_penjual and nama_produk and no_wa and uploaded_images and lokasi_toko_final:
                 files_to_process = uploaded_images[:5]
                 saved_filenames_list = []
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -285,6 +451,7 @@ elif menu == "➕ Daftarkan Jualan Anda":
                         "Nama Produk": nama_produk,
                         "Kategori": kategori,
                         "Harga": harga_final,
+                        "Lokasi Toko": lokasi_toko_final,
                         "No WA (Format: 62xx)": clean_wa,
                         "Deskripsi": deskripsi,
                         "Daftar File Gambar": csv_images_value
@@ -297,7 +464,7 @@ elif menu == "➕ Daftarkan Jualan Anda":
                     st.balloons()
                     st.rerun()
             else:
-                st.error("Mohon lengkapi data penting: Nama, Nama Produk, WhatsApp, dan minimal 1 Foto Produk.")
+                st.error("Mohon lengkapi data penting: Nama, Nama Produk, Lokasi Toko, WhatsApp, dan minimal 1 Foto Produk.")
 
 # --- HALAMAN 3: EDIT & DELETE ---
 elif menu == "⚙️ Kelola Jualan Anda":
@@ -333,10 +500,55 @@ elif menu == "⚙️ Kelola Jualan Anda":
             if action == "📝 Edit Data Produk":
                 st.subheader(f"Form Edit: {row_data['Nama Produk']}")
                 
-                with st.form("form_edit_produk"):
+                # --- AMBIL DATA LOKASI LAMA ---
+                lokasi_lama_str = str(row_data.get("Lokasi Toko", ""))
+                def_kec_idx = 0
+                def_desa_idx = 0
+                if " | " in lokasi_lama_str:
+                    old_k, old_d = lokasi_lama_str.split(" | ", 1)
+                    if old_k in LIST_KECAMATAN:
+                        def_kec_idx = LIST_KECAMATAN.index(old_k)
+                        old_desas = list(DATA_WILAYAH[old_k].keys())
+                        if old_d in old_desas:
+                            def_desa_idx = old_desas.index(old_d)
+
+                # --- DROPDOWN LOKASI DITARUH DI LUAR FORM AGAR INTERAKTIF/CASCADING RE-RENDER ---
+                st.markdown("**📍 Lokasi Toko / Penjual:**")
+                col_kec_e, col_desa_e = st.columns(2)
+                
+                with col_kec_e:
+                    edit_kec_vendor = st.selectbox(
+                        "Pilih Kecamatan/Kabupaten:", 
+                        options=LIST_KECAMATAN, 
+                        index=def_kec_idx, 
+                        key=f"vendor_kec_edit_{target_idx}"
+                    )
+                
+                # List desa dinamis menyesuaikan kecamatan yang sedang dipilih
+                edit_desa_list = list(DATA_WILAYAH[edit_kec_vendor].keys())
+                
+                # Tentukan default index desa
+                if edit_kec_vendor == LIST_KECAMATAN[def_kec_idx]:
+                    current_desa_idx = def_desa_idx if def_desa_idx < len(edit_desa_list) else 0
+                else:
+                    current_desa_idx = 0
+
+                with col_desa_e:
+                    edit_desa_vendor = st.selectbox(
+                        "Pilih Desa/Kelurahan:", 
+                        options=edit_desa_list, 
+                        index=current_desa_idx, 
+                        key=f"vendor_desa_edit_{target_idx}_{edit_kec_vendor}"
+                    )
+                
+                edit_lokasi_toko_final = f"{edit_kec_vendor} | {edit_desa_vendor}"
+
+                # --- FORM UNTUK FIELD LAINNYA ---
+                with st.form(f"form_edit_produk_{target_idx}"):
                     edit_nama_penjual = st.text_input("Nama Lengkap:", value=row_data["Nama Penjual"])
                     edit_angkatan = st.selectbox("Angkatan Sempat:", ["86", "Lainnya"], index=0 if row_data["Angkatan"] == "86" else 1)
                     edit_nama_produk = st.text_input("Nama Produk/Jasa:", value=row_data["Nama Produk"])
+                    
                     edit_kategori = st.selectbox(
                         "Kategori:", 
                         ["Kuliner", "Fashion & Atribut", "Jasa / Keahlian", "Umum"],
@@ -364,7 +576,6 @@ elif menu == "⚙️ Kelola Jualan Anda":
                         edit_harga_final = edit_harga_opsi
                         
                     edit_deskripsi = st.text_area("Deskripsi Singkat:", value=row_data["Deskripsi"])
-                    st.info("💡 Catatan: Untuk versi saat ini, jika ingin mengganti foto silakan hapus produk lalu daftarkan kembali dengan foto baru.")
                     
                     submit_edit = st.form_submit_button("Simpan Perubahan")
                     
@@ -372,6 +583,7 @@ elif menu == "⚙️ Kelola Jualan Anda":
                         df_products.at[target_idx, "Nama Penjual"] = edit_nama_penjual
                         df_products.at[target_idx, "Angkatan"] = edit_angkatan
                         df_products.at[target_idx, "Nama Produk"] = edit_nama_produk
+                        df_products.at[target_idx, "Lokasi Toko"] = edit_lokasi_toko_final
                         df_products.at[target_idx, "Kategori"] = edit_kategori
                         df_products.at[target_idx, "Harga"] = edit_harga_final
                         df_products.at[target_idx, "Deskripsi"] = edit_deskripsi
