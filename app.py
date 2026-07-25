@@ -85,6 +85,17 @@ DATA_WILAYAH = {
         "Desa Mertapada": (-6.8050, 108.6280),
         "Desa Kanci": (-6.7890, 108.6200)
     },
+    "Kab. Cirebon - Kec. Talun": {
+        "Desa Cirebon Girang": (-6.7620, 108.5300),
+        "Desa Kecomberan": (-6.7550, 108.5380),
+        "Desa Ciperna": (-6.7680, 108.5450),
+        "Desa Sampiran": (-6.7780, 108.5320),
+        "Desa Kepongpongan": (-6.7480, 108.5350),
+        "Desa Wanasaba Kidul": (-6.7720, 108.5250),
+        "Desa Wanasaba Lor": (-6.7680, 108.5200),
+        "Desa Kubang": (-6.7850, 108.5210),
+        "Desa Sarabawa": (-6.7590, 108.5150)
+    },
 
     # --- WILAYAH SEKITAR (CIAYUMAJAKUNING) ---
     "Kab. Kuningan": {
