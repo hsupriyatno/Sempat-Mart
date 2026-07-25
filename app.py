@@ -131,7 +131,7 @@ def get_coords_from_str(lokasi_str):
         return (-6.7305, 108.5482)
 
 # --- FUNGSI HITUNG ONGKIR DARI HIERARKI ---
-def hitung_ongkir_cascading(lokasi_asal_str, lokasi_tujuan_str, tarif_per_km=4000, min_ongkir=10000):
+def hitung_ongkir_cascading(lokasi_asal_str, lokasi_tujuan_str, tarif_per_km=5000, min_ongkir=10000):
     try:
         coord1 = get_coords_from_str(lokasi_asal_str)
         coord2 = get_coords_from_str(lokasi_tujuan_str)
