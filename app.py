@@ -139,8 +139,8 @@ def hitung_ongkir_cascading(lokasi_asal_str, lokasi_tujuan_str, tarif_per_km=400
         # 1. Jarak Garis Lurus
         jarak_garis_lurus = geodesic(coord1, coord2).km
         
-        # 2. Jarak Rute Jalan Raya (Pengali 1.2)
-        jarak_rute = jarak_garis_lurus * 1.2
+        # 2. Jarak Rute Jalan Raya (Pengali 1.3)
+        jarak_rute = jarak_garis_lurus * 1.3
         
         # Jika asal & tujuan sama persis (sama kelurahan/desa)
         if jarak_rute < 0.5:
