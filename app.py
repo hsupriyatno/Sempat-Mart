@@ -376,21 +376,37 @@ if menu == "🛍️ Katalog Produk":
 elif menu == "➕ Daftarkan Jualan Anda":
     st.title("➕ Daftarkan Jualan Anda")
     st.write("Silakan isi formulir dan unggah foto produk Anda (Maksimal 5 Foto).")
+    st.markdown("---")
     
+    # --- DROPDOWN LOKASI DITARUH DI LUAR FORM AGAR INTERAKTIF/CASCADING RE-RENDER ---
+    st.markdown("**📍 Lokasi Toko / Penjual:**")
+    col_kec_v, col_desa_v = st.columns(2)
+    
+    with col_kec_v:
+        kec_vendor = st.selectbox(
+            "Pilih Kecamatan/Kabupaten:", 
+            options=LIST_KECAMATAN, 
+            key="vendor_kec_add"
+        )
+    
+    # List desa dinamis menyesuaikan kecamatan yang dipilih
+    desa_vendor_list = list(DATA_WILAYAH[kec_vendor].keys())
+    
+    with col_desa_v:
+        desa_vendor = st.selectbox(
+            "Pilih Desa/Kelurahan:", 
+            options=desa_vendor_list, 
+            key=f"vendor_desa_add_{kec_vendor}" # Dynamic key mengikuti kecamatan
+        )
+        
+    lokasi_toko_final = f"{kec_vendor} | {desa_vendor}"
+    st.markdown("---")
+
+    # --- FORM UNTUK FIELD LAINNYA ---
     with st.form("form_tambah_produk", clear_on_submit=False):
         nama_penjual = st.text_input("Nama Lengkap:")
         angkatan = st.selectbox("Angkatan SMPN-4 Cirebon:", ["86", "Lainnya"])
         nama_produk = st.text_input("Nama Produk/Jasa:")
-        
-        # CASCADING DROPDOWN UNTUK LOKASI TOKO
-        st.markdown("**📍 Lokasi Toko / Penjual:**")
-        col_kec_v, col_desa_v = st.columns(2)
-        with col_kec_v:
-            kec_vendor = st.selectbox("Pilih Kecamatan/Kabupaten:", options=LIST_KECAMATAN, key="vendor_kec_add")
-        with col_desa_v:
-            desa_vendor = st.selectbox("Pilih Desa/Kelurahan:", options=list(DATA_WILAYAH[kec_vendor].keys()), key="vendor_desa_add")
-            
-        lokasi_toko_final = f"{kec_vendor} | {desa_vendor}"
         
         uploaded_images = st.file_uploader(
             "Unggah Foto Produk (Maksimal 5 foto)", 
