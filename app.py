@@ -353,7 +353,7 @@ if menu == "🛍️ Katalog Produk":
                             min_ongkir=10000     # <-- Silakan ubah tarif min ongkir jika perlu
                         )
                         
-                        st.success(f"📏 Est. Jarak Rute (x12): **{jarak_km} km**")
+                        st.success(f"📏 Est. Jarak Rute (x1.2): **{jarak_km} km**")
                         st.info(f"💵 Est. Ongkir: **Rp {total_ongkir:,}**")
 
                     # --- HUBUNGI WA DI HP ---
