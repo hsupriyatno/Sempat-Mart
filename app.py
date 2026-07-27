@@ -131,7 +131,7 @@ def get_coords_from_str(lokasi_str):
         return (-6.7305, 108.5482)
 
 # --- FUNGSI HITUNG ONGKIR DARI HIERARKI ---
-def hitung_ongkir_cascading(lokasi_asal_str, lokasi_tujuan_str, tarif_per_km=4000, min_ongkir=10000):
+def hitung_ongkir_cascading(lokasi_asal_str, lokasi_tujuan_str, tarif_per_km=3000, min_ongkir=10000):
     try:
         coord1 = get_coords_from_str(lokasi_asal_str)
         coord2 = get_coords_from_str(lokasi_tujuan_str)
@@ -139,8 +139,8 @@ def hitung_ongkir_cascading(lokasi_asal_str, lokasi_tujuan_str, tarif_per_km=400
         # 1. Jarak Garis Lurus
         jarak_garis_lurus = geodesic(coord1, coord2).km
         
-        # 2. Jarak Rute Jalan Raya (Pengali 1.2)
-        jarak_rute = jarak_garis_lurus * 1.2
+        # 2. Jarak Rute Jalan Raya (Pengali 1.5)
+        jarak_rute = jarak_garis_lurus * 1.5
         
         # Jika asal & tujuan sama persis (sama kelurahan/desa)
         if jarak_rute < 0.5:
@@ -349,11 +349,11 @@ if menu == "🛍️ Katalog Produk":
                         jarak_km, total_ongkir = hitung_ongkir_cascading(
                             lokasi_penjual_str, 
                             lokasi_pembeli_str,
-                            tarif_per_km=4000,  # <-- Silakan ubah tarif per km jika perlu
+                            tarif_per_km=3000,  # <-- Silakan ubah tarif per km jika perlu
                             min_ongkir=10000     # <-- Silakan ubah tarif min ongkir jika perlu
                         )
                         
-                        st.success(f"📏 Est. Jarak Rute (x1.2): **{jarak_km} km**")
+                       
                         st.info(f"💵 Est. Ongkir: **Rp {total_ongkir:,}**")
 
                     # --- HUBUNGI WA DI HP ---
